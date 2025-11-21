@@ -60,6 +60,13 @@ class MaterialBlock:
     content: str = ""
 
 
+@dataclass
+class FormulaBlock:
+    """수식 블록 (LaTeX 등)"""
+    formula: str
+    display_mode: bool = True  # True: 블록 수식, False: 인라인 수식
+
+
 Block = (
     SectionTitleBlock
     | ParagraphBlock
@@ -71,4 +78,5 @@ Block = (
     | HorizontalLineBlock
     | TableBlock
     | MaterialBlock
+    | FormulaBlock
 )

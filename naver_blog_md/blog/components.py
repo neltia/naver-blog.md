@@ -11,7 +11,8 @@ from naver_blog_md.markdown.models import (
     SectionTitleBlock,
     QuotationBlock,
     TableBlock,
-    MaterialBlock
+    MaterialBlock,
+    FormulaBlock
 )
 
 
@@ -208,3 +209,41 @@ def image_component(component: Tag) -> Block:
 
 def _text_from_tag(tag: Tag):
     return tag.get_text(strip=True).strip()
+
+
+def wrapping_paragraph_component(component: Tag) -> Block:
+    """텍스트 박스나 래핑된 단락 컴포넌트 처리"""
+    # se-wrappingParagraph는 보통 텍스트 박스나 특별한 스타일의 단락
+    text_elem = component.select_one(".se-module-text")
+
+    if text_elem:
+        text = _text_from_tag(text_elem)
+    else:
+        text = _text_from_tag(component)
+
+    return ParagraphBlock(text=text)
+
+
+def formula_component(component: Tag) -> Block:
+    """수식 컴포넌트 처리 (LaTeX)"""
+    # 수식 데이터 추출
+    formula_elem = component.select_one(".se-module-formula")
+
+    if not formula_elem:
+        return FormulaBlock(formula="", display_mode=True)
+
+    # data-katex 속성에서 LaTeX 수식 추출
+    formula = formula_elem.get("data-katex", "")
+
+    # 또는 data-latex 속성 확인
+    if not formula:
+        formula = formula_elem.get("data-latex", "")
+
+    # 또는 텍스트 내용 추출
+    if not formula:
+        formula = _text_from_tag(formula_elem)
+
+    # display 모드 확인 (블록 수식 vs 인라인 수식)
+    display_mode = "display" in formula_elem.get("class", [])
+
+    return FormulaBlock(formula=formula, display_mode=display_mode)

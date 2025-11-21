@@ -82,8 +82,11 @@ def use_post(blog_id: str, log_no: int):
                                 'text': f'[{title}]({url})\n'
                             }
                         }
-                    yield MaterialBlock(text_component)
-                    continue
+                        yield MaterialBlock(text_component)
+                case "se-wrappingParagraph":
+                    yield Components.wrapping_paragraph_component(component)
+                case "se-formula":
+                    yield Components.formula_component(component)
                 case unknown:
                     raise ValueError(f"Unknown component type: {unknown}")
 

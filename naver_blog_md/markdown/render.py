@@ -15,7 +15,8 @@ from naver_blog_md.markdown.models import (
     SectionTitleBlock,
     QuotationBlock,
     TableBlock,
-    MaterialBlock
+    MaterialBlock,
+    FormulaBlock
 )
 from naver_blog_md.multiprocess.pool import use_map
 
@@ -77,11 +78,19 @@ def _block_as_markdown(
             return ""
         case FileBlock(filename, file_url):
             # 마크다운 링크 형식으로 첨부파일 표시
-            # 📎 이모지로 파일임을 표시
             return f"📎 [{filename}]({file_url})\n\n"
         case HorizontalLineBlock():
             # 마크다운 수평선 (3가지 방식 모두 가능, 여기서는 --- 사용)
             return "---\n\n"
+        # _block_as_markdown 함수의 match 문에 추가:
+        case FormulaBlock(formula=""):
+            return ""
+        case FormulaBlock(formula, display_mode=True):
+            # 블록 수식 (display mode) - $$ ... $$
+            return f"$$\n{formula}\n$$\n\n"
+        case FormulaBlock(formula, display_mode=False):
+            # 인라인 수식 - $ ... $
+            return f"${formula}$\n\n"
         case TableBlock(headers=[], rows=[]):
             return ""
         case TableBlock(headers, rows):
