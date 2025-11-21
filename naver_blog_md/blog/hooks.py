@@ -10,7 +10,7 @@ from naver_blog_md.blog import metadata as Metadata
 from naver_blog_md.blog.models import PostItem, PostListResponse
 from naver_blog_md.fp.lazy_val import lazy_val
 from naver_blog_md.markdown.context import MarkdownRenderContext
-from naver_blog_md.markdown.models import Block, ImageBlock, ImageGroupBlock
+from naver_blog_md.markdown.models import Block, ImageBlock, ImageGroupBlock, MaterialBlock
 from naver_blog_md.markdown.render import blocks_as_markdown
 from naver_blog_md.multiprocess.pool import use_map
 
@@ -45,12 +45,45 @@ def use_post(blog_id: str, log_no: int):
                     yield Components.image_component(component)
                 case "se-imageGroup":
                     yield Components.image_group_component(component)
+                case "se-imageStrip":  # 이미지 스트립 처리 추가
+                    yield Components.image_strip_component(component)
                 case "se-placesMap":
                     pass
+                case "se-quotation":  # 인용구 처리 추가
+                    yield Components.quotation_component(component)
+                case "se-code":  # 코드 블록 처리 추가
+                    yield Components.code_component(component)
+                case "se-file":
+                    yield Components.file_component(component)
+                case "se-horizontalLine":  # 수평선 처리 추가
+                    yield Components.horizontal_line_component(component)
+                case "se-table":  # 테이블 처리 추가
+                    yield Components.table_component(component)
                 case "se-text":
                     yield from Components.text_component(component)
+                case "se-material":  # Material 처리 추가
+                    yield Components.material_component(component)
+                case 'se-sticker':
+                    pass
                 case "se-oglink":
                     pass
+                case 'se-oembed':
+                    # oembed (YouTube, Twitter 등)를 링크로 변환
+                    oembed_data = component.get('data', {})
+                    url = oembed_data.get('url') or oembed_data.get('originalUrl')
+
+                    if url:
+                        # 링크를 마크다운 텍스트로 변환
+                        title = oembed_data.get('title', 'Embedded Content')
+                        # TextBlock 형태로 변환하여 yield
+                        text_component = {
+                            'componentType': 'text',
+                            'data': {
+                                'text': f'[{title}]({url})\n'
+                            }
+                        }
+                    yield MaterialBlock(text_component)
+                    continue
                 case unknown:
                     raise ValueError(f"Unknown component type: {unknown}")
 
@@ -82,26 +115,61 @@ def _first_image_of_blocks(blocks: Iterator[Block]) -> ImageBlock | None:
 def use_blog(blog_id: str):
     @lazy_val
     def posts() -> list[PostItem]:
-        response = _post_title_list(blog_id)
+        # 첫 페이지로 실제 총 개수 확인
+        first_response = _post_title_list(blog_id, count_per_page=30)  # 페이지당 개수 늘리기
 
-        total_count, count_per_page = response.total_count, response.count_per_page
+        total_count = first_response.total_count
+        count_per_page = first_response.count_per_page
 
-        map = use_map(8)  # FIXME: Make this configurable
+        print(f"Total posts: {total_count}, Count per page: {count_per_page}")
 
-        return [
+        # 포스트가 없는 경우
+        if total_count == 0:
+            return []
+
+        # 총 페이지 수 계산
+        total_pages = ceil(total_count / count_per_page)
+
+        print(f"Need to fetch {total_pages} pages")
+
+        # 페이지가 1개면 첫 페이지만 반환
+        if total_pages == 1:
+            return first_response.post_list
+
+        map = use_map(8)
+
+        # 2페이지부터 마지막 페이지까지
+        remaining_pages = map(
+            lambda page_number: _fetch_page_safe(blog_id, page_number, count_per_page),
+            range(2, total_pages + 1),
+        )
+
+        # 결과 합치기
+        all_posts = first_response.post_list + [
             item
-            for items in map(
-                lambda page_number: _post_title_list(blog_id, page_number).post_list,
-                range(1, ceil(total_count / count_per_page) + 1),
-            )
+            for items in remaining_pages
             for item in items
         ]
+
+        print(f"Fetched total {len(all_posts)} posts")
+
+        return all_posts
 
     return (posts,)
 
 
+def _fetch_page_safe(blog_id: str, page_number: int, count_per_page: int) -> list[PostItem]:
+    """페이지를 안전하게 가져오는 헬퍼 함수"""
+    try:
+        response = _post_title_list(blog_id, page_number, count_per_page=count_per_page)
+        return response.post_list
+    except Exception as e:
+        print(f"Failed to fetch page {page_number}: {e}")
+        return []
+
+
 def _post_title_list(
-    blog_id: str, current_page: int = 1, category_no: int = 0, count_per_page: int = 5
+    blog_id: str, current_page: int = 1, category_no: int = 0, count_per_page: int = 30
 ):
     response = requests.get(
         "https://blog.naver.com/PostTitleListAsync.naver",
@@ -113,9 +181,13 @@ def _post_title_list(
         },
     )
 
-    return PostListResponse.model_validate_json(
-        response.text.split(',"pagingHtml"')[0] + "}"
-    )
+    response_text = response.text
+
+    # pagingHtml 제거
+    if ',"pagingHtml"' in response_text:
+        response_text = response_text.split(',"pagingHtml"')[0] + "}"
+
+    return PostListResponse.model_validate_json(response_text)
 
 
 def _remove_unicode_special_characters(text: str):
