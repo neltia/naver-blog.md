@@ -12,7 +12,9 @@ from naver_blog_md.markdown.models import (
     QuotationBlock,
     TableBlock,
     MaterialBlock,
-    FormulaBlock
+    FormulaBlock,
+    VideoBlock,
+    AnniversarySectionBlock
 )
 
 
@@ -247,3 +249,63 @@ def formula_component(component: Tag) -> Block:
     display_mode = "display" in formula_elem.get("class", [])
 
     return FormulaBlock(formula=formula, display_mode=display_mode)
+
+
+def video_component(component: Tag) -> Block:
+    """비디오 컴포넌트 처리"""
+    video_elem = component.select_one("video")
+    iframe_elem = component.select_one("iframe")
+
+    src = ""
+    thumbnail = ""
+
+    if video_elem:
+        # 네이버 블로그 자체 비디오
+        src = video_elem.get("src", "")
+        poster = video_elem.get("poster", "")
+        thumbnail = poster if poster else ""
+    elif iframe_elem:
+        # 임베디드 비디오 (YouTube 등)
+        src = iframe_elem.get("src", "")
+    else:
+        # data 속성에서 추출 시도
+        video_data = component.get("data-module", {})
+        if isinstance(video_data, dict):
+            src = video_data.get("src", "")
+
+    # 캡션 추출
+    caption = component.select_one(".se-caption")
+    alt_text = _text_from_tag(caption) if caption else ""
+
+    return VideoBlock(src=src, alt=alt_text, thumbnail=thumbnail)
+
+
+def anniversary_section_component(component: Tag) -> Block:
+    """기념일 섹션 컴포넌트 처리"""
+    # 기념일 섹션은 네이버 블로그의 특수 컴포넌트
+    # 텍스트 내용을 추출하거나 무시할 수 있음
+
+    # 제목 추출
+    title_elem = component.select_one(".se-anniversary-title")
+    title = _text_from_tag(title_elem) if title_elem else ""
+
+    # 날짜 추출
+    date_elem = component.select_one(".se-anniversary-date")
+    date = _text_from_tag(date_elem) if date_elem else ""
+
+    # 설명 추출
+    desc_elem = component.select_one(".se-anniversary-desc")
+    desc = _text_from_tag(desc_elem) if desc_elem else ""
+
+    # 전체 내용 조합
+    content_parts = []
+    if title:
+        content_parts.append(f"**{title}**")
+    if date:
+        content_parts.append(f"date: {date}")
+    if desc:
+        content_parts.append(desc)
+
+    content = "\n".join(content_parts) if content_parts else _text_from_tag(component)
+
+    return AnniversarySectionBlock(content=content)

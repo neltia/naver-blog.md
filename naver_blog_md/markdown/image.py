@@ -50,12 +50,29 @@ def _fetch_image_processor(src: str, **context: Unpack[ImageFetchContext]) -> st
     assert context["assets_directory"].is_dir()
 
     url = _original_image_url(src)
-    response = requests.get(url)
 
-    response.raise_for_status()
+    try:
+        # User-Agent 및 Referer 헤더 추가
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Referer': 'https://blog.naver.com/',
+            'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
+        }
 
-    filename = unquote_plus(url.split("/")[-1])
+        response = requests.get(url, headers=headers, timeout=15, allow_redirects=True)
+        response.raise_for_status()
 
-    (context["assets_directory"] / filename).write_bytes(response.content)
+        filename = unquote_plus(url.split("/")[-1])
 
-    return f"{context['image_src_prefix']}{filename}"
+        (context["assets_directory"] / filename).write_bytes(response.content)
+
+        return f"{context['image_src_prefix']}{filename}"
+
+    except requests.exceptions.RequestException as e:
+        # 다운로드 실패 시 원본 URL 반환
+        print(f"Warning: Failed to fetch image {url}: {e}. Using original URL.")
+        return src
+    except Exception as e:
+        # 파일 쓰기 실패 등 기타 에러
+        print(f"Warning: Error processing image {url}: {e}. Using original URL.")
+        return src

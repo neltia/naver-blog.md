@@ -16,7 +16,9 @@ from naver_blog_md.markdown.models import (
     QuotationBlock,
     TableBlock,
     MaterialBlock,
-    FormulaBlock
+    FormulaBlock,
+    VideoBlock,
+    AnniversarySectionBlock
 )
 from naver_blog_md.multiprocess.pool import use_map
 
@@ -82,7 +84,6 @@ def _block_as_markdown(
         case HorizontalLineBlock():
             # 마크다운 수평선 (3가지 방식 모두 가능, 여기서는 --- 사용)
             return "---\n\n"
-        # _block_as_markdown 함수의 match 문에 추가:
         case FormulaBlock(formula=""):
             return ""
         case FormulaBlock(formula, display_mode=True):
@@ -122,6 +123,25 @@ def _block_as_markdown(
             # Material 컨텐츠가 있으면 인용구 형태로 표시 (선택사항)
             # 또는 그냥 무시하려면 return "" 사용
             return f"> [Material] {content}\n\n"
+        case VideoBlock(src=""):
+            return ""
+        case VideoBlock(src, alt, thumbnail):
+            # 비디오를 링크로 표현 (마크다운은 비디오를 직접 지원하지 않음)
+            # 썸네일이 있으면 이미지 링크로, 없으면 텍스트 링크로
+            if thumbnail:
+                # 썸네일 이미지를 클릭하면 비디오로 이동
+                return f"[![{alt}]({processed_image_src(thumbnail)})]({src})\n\n"
+            else:
+                # 단순 링크
+                video_text = alt if alt else "Video"
+                return f"video: [{video_text}]({src})\n\n"
+        case AnniversarySectionBlock(content=""):
+            return ""
+        case AnniversarySectionBlock(content):
+            # 기념일 섹션을 인용구 스타일로 표현
+            lines = content.strip().split('\n')
+            formatted = '\n'.join(f"> {line}" for line in lines)
+            return f"{formatted}\n\n"
         case ImageBlock(src=""):
             return ""
         case ImageBlock(src, alt):
@@ -147,14 +167,12 @@ def _front_matter_as_yaml(
         front_matter["image"]["url"] = image_processor(front_matter["image"]["url"])
 
     return (
-        "---\n"
-        + yaml.safe_dump(
+        "---\n" + yaml.safe_dump(
             front_matter,
             default_flow_style=False,
             allow_unicode=True,
             default_style=None,
-        )
-        + "---\n\n"
+        ) + "---\n\n"
     )
 
 

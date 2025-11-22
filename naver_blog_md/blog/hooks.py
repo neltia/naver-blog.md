@@ -87,6 +87,10 @@ def use_post(blog_id: str, log_no: int):
                     yield Components.wrapping_paragraph_component(component)
                 case "se-formula":
                     yield Components.formula_component(component)
+                case "se-video":
+                    yield Components.video_component(component)
+                case "se-anniversarySection":
+                    yield Components.anniversary_section_component(component)
                 case unknown:
                     raise ValueError(f"Unknown component type: {unknown}")
 

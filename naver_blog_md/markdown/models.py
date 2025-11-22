@@ -67,6 +67,20 @@ class FormulaBlock:
     display_mode: bool = True  # True: 블록 수식, False: 인라인 수식
 
 
+@dataclass
+class VideoBlock:
+    """비디오 블록"""
+    src: str
+    alt: str = ""
+    thumbnail: str = ""
+
+
+@dataclass
+class AnniversarySectionBlock:
+    """기념일 섹션 블록 (네이버 블로그의 특수 컴포넌트)"""
+    content: str = ""
+
+
 Block = (
     SectionTitleBlock
     | ParagraphBlock
@@ -79,4 +93,6 @@ Block = (
     | TableBlock
     | MaterialBlock
     | FormulaBlock
+    | VideoBlock
+    | AnniversarySectionBlock
 )
